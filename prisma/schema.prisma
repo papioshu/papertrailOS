@@ -50,6 +50,8 @@ model Profile {
   settings    ProfileSettings?
   campaigns   Campaign[]
   leads       Lead[]
+  gmail       GmailConnection?
+  sendQueue   SendQueue[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 }
@@ -149,6 +151,7 @@ model Lead {
   campaign       Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
   audits         WebsiteAudit[]
   drafts         OutreachDraft[]
+  sendItems      SendQueue[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -176,11 +179,50 @@ model OutreachDraft {
   approvedAt       DateTime?
   sentAt           DateTime?
   lead             Lead      @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  sendItems        SendQueue[]
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   @@unique([leadId, channel])
   @@index([profileId])
+}
+
+// Per-profile Gmail authorization for creating drafts / controlled sending.
+// Tokens are profile-scoped and server-only.
+model GmailConnection {
+  id           String    @id @default(cuid())
+  profileId    String    @unique
+  email        String
+  refreshToken String
+  accessToken  String?
+  expiry       DateTime?
+  profile      Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+}
+
+// One outreach send attempt. The queue is the single audited path to Gmail —
+// nothing sends outside it, and a (draftId) send is never duplicated.
+model SendQueue {
+  id            String    @id @default(cuid())
+  profileId     String
+  leadId        String
+  draftId       String
+  channel       String
+  status        String    @default("queued") // queued | drafted | sent | failed | blocked
+  gmailDraftId  String?
+  gmailMessageId String?
+  error         String?
+  attempts      Int       @default(0)
+  sentAt        DateTime?
+  profile       Profile       @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  lead          Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  draft         OutreachDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([profileId])
+  @@index([leadId])
 }
 
 // One website audit run for a lead. The most recent row is the current audit.

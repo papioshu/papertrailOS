@@ -17,6 +17,8 @@ import { LeadTools } from "@/components/leads/LeadTools";
 import { RunAudit } from "@/components/leads/RunAudit";
 import { LeadTable, type LeadRow } from "@/components/leads/LeadTable";
 import { DraftPanel, type DraftRow } from "@/components/outreach/DraftPanel";
+import { SendPanel } from "@/components/outreach/SendPanel";
+import { googleConfigured } from "@/lib/gmail/gmail";
 import {
   createCampaignAction,
   addLeadAction,
@@ -26,6 +28,8 @@ import {
   generateDraftsAction,
   updateDraftAction,
   approveDraftAction,
+  dispatchDraftAction,
+  markContactedAction,
 } from "./actions";
 
 const CHANNEL_ORDER = ["email", "dm", "call", "followup1", "followup2"];
@@ -51,7 +55,7 @@ export default async function WorkflowPage({
 
   const profile = await prisma.profile.findUnique({
     where: { slug },
-    include: { settings: true },
+    include: { settings: true, gmail: true },
   });
   if (!profile) return <SeedPanel />;
 
@@ -65,6 +69,7 @@ export default async function WorkflowPage({
         include: {
           audits: { orderBy: { createdAt: "desc" }, take: 1 },
           drafts: true,
+          sendItems: true,
         },
       })
     : null;
@@ -204,6 +209,17 @@ export default async function WorkflowPage({
               generateDrafts={generateDraftsAction.bind(null, slug, selectedLead.id)}
               updateDraft={updateDraftAction.bind(null, slug)}
               approveDraft={approveDraftAction.bind(null, slug)}
+              mode={profile.settings?.agentMode ?? "draft_only"}
+              gmail={{
+                configured: googleConfigured(),
+                connected: Boolean(profile.gmail),
+                email: profile.gmail?.email ?? null,
+              }}
+              sendStatus={Object.fromEntries(
+                selectedLead.sendItems.map((s) => [s.draftId, { status: s.status, error: s.error }]),
+              )}
+              dispatchDraft={dispatchDraftAction.bind(null, slug)}
+              markContacted={markContactedAction.bind(null, slug, selectedLead.id)}
             />
           ) : (
             <p className="text-sm text-muted">
@@ -251,6 +267,11 @@ function LeadDetail({
   generateDrafts,
   updateDraft,
   approveDraft,
+  mode,
+  gmail,
+  sendStatus,
+  dispatchDraft,
+  markContacted,
 }: {
   lead: DetailLead;
   audit: DetailAudit;
@@ -260,6 +281,11 @@ function LeadDetail({
   generateDrafts: () => Promise<{ ok?: boolean; error?: string } | { ok: boolean; composed: number; provider: string }>;
   updateDraft: (id: string, subject: string, body: string) => Promise<{ ok?: boolean; error?: string }>;
   approveDraft: (id: string) => Promise<{ ok?: boolean; error?: string }>;
+  mode: string;
+  gmail: { configured: boolean; connected: boolean; email: string | null };
+  sendStatus: Record<string, { status: string; error?: string | null }>;
+  dispatchDraft: (draftId: string) => Promise<{ status: "drafted" | "sent" | "blocked"; reason?: string; detail?: string }>;
+  markContacted: () => Promise<{ ok?: boolean }>;
 }) {
   const scores: AuditScores | null =
     audit && audit.reachable
@@ -318,6 +344,25 @@ function LeadDetail({
           generate={generateDrafts}
           updateDraft={updateDraft}
           approveDraft={approveDraft}
+        />
+      </div>
+
+      <div className="rounded-md border border-line p-3">
+        <SendPanel
+          slug={slug}
+          mode={mode}
+          gmail={gmail}
+          drafts={drafts
+            .filter((d) => d.channel === "email" || d.channel === "followup1" || d.channel === "followup2")
+            .map((d) => ({
+              id: d.id,
+              channel: d.channel,
+              approved: d.approved,
+              compliancePassed: d.complianceStatus === "pass",
+            }))}
+          sendStatus={sendStatus}
+          dispatch={dispatchDraft}
+          markContacted={markContacted}
         />
       </div>
 

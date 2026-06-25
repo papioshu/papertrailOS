@@ -10,6 +10,7 @@ import { isLeadStatus } from "@/lib/leadStatus";
 import { runAuditAndGrade } from "@/lib/audit/runAudit";
 import { composeDraftsForLead } from "@/lib/outreach/draftEngine";
 import { checkCompliance, type DraftChannel } from "@/lib/outreach/complianceChecker";
+import { dispatchDraft } from "@/lib/outreach/sendRunner";
 import type { ProfileSlug } from "@/lib/profiles";
 
 function str(fd: FormData, key: string): string | null {
@@ -136,6 +137,24 @@ export async function approveDraftAction(slug: string, draftId: string) {
   await prisma.outreachDraft.update({
     where: { id: draftId },
     data: { approved: true, approvedBy: userId, approvedAt: new Date() },
+  });
+  revalidatePath(`/p/${slug}`);
+  return { ok: true };
+}
+
+export async function dispatchDraftAction(slug: string, draftId: string) {
+  // Least-privilege at the action; the send guard enforces mode/approval/cap.
+  const { profile } = await requireProfile(slug, "create_drafts");
+  const result = await dispatchDraft(profile.id, draftId);
+  revalidatePath(`/p/${slug}`);
+  return result;
+}
+
+export async function markContactedAction(slug: string, leadId: string) {
+  const { profile } = await requireProfile(slug, "mark_status");
+  await prisma.lead.updateMany({
+    where: { id: leadId, profileId: profile.id },
+    data: { status: "Contacted" },
   });
   revalidatePath(`/p/${slug}`);
   return { ok: true };
