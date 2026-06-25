@@ -1,0 +1,72 @@
+@import "tailwindcss";
+
+/* Papertrail OS — GEN X SOFT CLUB design tokens.
+   Dark purple soft-club lighting, transit signage, analog paper. */
+@theme {
+  --color-ink: #0b0814;
+  --color-ink-2: #110c20;
+  --color-panel: #16102b;
+  --color-panel-2: #1d1638;
+  --color-line: #2c2350;
+  --color-violet: #8b5cf6;
+  --color-violet-soft: #b8a4e3;
+  --color-gold: #c9a227;
+  --color-lime: #aef044;
+  --color-signal: #ff4d6d;
+  --color-fg: #ece8fb;
+  --color-muted: #9a92b8;
+
+  --font-mono: "SFMono-Regular", "JetBrains Mono", "Consolas", monospace;
+}
+
+html,
+body {
+  background: radial-gradient(120% 80% at 50% -10%, #1a1233 0%, var(--color-ink) 55%);
+  color: var(--color-fg);
+  min-height: 100%;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+/* Transit-signage label */
+.tt-label {
+  font-family: var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.66rem;
+  color: var(--color-muted);
+}
+
+/* Frosted card */
+.tt-card {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
+    var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 0.9rem;
+  backdrop-filter: blur(6px);
+}
+
+/* Subtle scanline overlay for ambient panels */
+.tt-scan {
+  position: relative;
+}
+.tt-scan::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.025) 0px,
+    rgba(255, 255, 255, 0.025) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.5;
+}
+
+.tt-glow {
+  box-shadow: 0 0 0 1px var(--color-line), 0 8px 40px -12px var(--glow, var(--color-violet));
+}

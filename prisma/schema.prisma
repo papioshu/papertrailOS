@@ -1,0 +1,126 @@
+// Papertrail OS — foundation schema (Phase 1).
+// DB: Supabase Postgres. ORM: Prisma. Profile isolation is enforced in app
+// code (Prisma query scoping + server guards), not RLS, per stack decision.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  super_admin
+  profile_admin
+  profile_member
+  viewer
+}
+
+// Outreach safety posture for a profile. Default keeps sending off.
+enum AgentMode {
+  draft_only
+  manual_approval
+  controlled_send
+}
+
+model User {
+  id           String              @id @default(cuid())
+  email        String              @unique
+  name         String?
+  passwordHash String
+  // Paper / Papers developer account: access to every profile.
+  isSuperAdmin Boolean             @default(false)
+  memberships  ProfileMembership[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+}
+
+model Profile {
+  id          String              @id @default(cuid())
+  slug        String              @unique
+  name        String
+  tagline     String?
+  // Hex accent used by the profile card / workflow chrome.
+  accent      String              @default("#8b5cf6")
+  memberships ProfileMembership[]
+  identity    BusinessIdentity?
+  settings    ProfileSettings?
+  campaigns   Campaign[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+}
+
+model ProfileMembership {
+  id        String   @id @default(cuid())
+  userId    String
+  profileId String
+  role      Role     @default(profile_member)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile   Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, profileId])
+  @@index([profileId])
+}
+
+// Required before any commercial email can send (CAN-SPAM identity + opt-out).
+model BusinessIdentity {
+  id            String   @id @default(cuid())
+  profileId     String   @unique
+  legalName     String?
+  fromName      String?
+  fromEmail     String?
+  phone         String?
+  website       String?
+  postalAddress String?
+  optOutText    String?
+  profile       Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ProfileSettings {
+  id             String    @id @default(cuid())
+  profileId      String    @unique
+  agentMode      AgentMode @default(draft_only)
+  dailySendCap   Int       @default(25)
+  manualApproval Boolean   @default(true)
+  sendWindow     String?   // e.g. "09:00-17:00"
+  businessDaysOnly Boolean @default(true)
+  profile        Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+}
+
+model Campaign {
+  id         String   @id @default(cuid())
+  profileId  String
+  name       String
+  niche      String?
+  city       String?
+  state      String?
+  sourceType String   @default("manual")
+  offerLane  String?
+  status     String   @default("active")
+  maxLeads   Int      @default(50)
+  profile    Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([profileId])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  profileId String?
+  userId    String?
+  action    String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([profileId])
+}
