@@ -10,18 +10,25 @@ import { gradeLead } from "@/lib/grade/gradingEngine";
 import { matchOffer } from "@/lib/offer/offerMatch";
 import type { AuditScores, Finding } from "@/lib/audit/auditEngine";
 import type { ProfileSlug } from "@/lib/profiles";
+import { roleCan } from "@/lib/rbac";
 import { AutoAnimate } from "@/components/AutoAnimate";
 import { CampaignBar } from "@/components/campaigns/CampaignBar";
 import { LeadTools } from "@/components/leads/LeadTools";
 import { RunAudit } from "@/components/leads/RunAudit";
 import { LeadTable, type LeadRow } from "@/components/leads/LeadTable";
+import { DraftPanel, type DraftRow } from "@/components/outreach/DraftPanel";
 import {
   createCampaignAction,
   addLeadAction,
   importCsvAction,
   runAuditAction,
   updateLeadStatusAction,
+  generateDraftsAction,
+  updateDraftAction,
+  approveDraftAction,
 } from "./actions";
+
+const CHANNEL_ORDER = ["email", "dm", "call", "followup1", "followup2"];
 
 const STEPS = [
   "Collect", "Research", "Audit", "Grade", "Draft",
@@ -55,7 +62,10 @@ export default async function WorkflowPage({
   const selectedLead = leadParam
     ? await prisma.lead.findFirst({
         where: { id: leadParam, profileId: profile.id },
-        include: { audits: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: {
+          audits: { orderBy: { createdAt: "desc" }, take: 1 },
+          drafts: true,
+        },
       })
     : null;
 
@@ -175,6 +185,25 @@ export default async function WorkflowPage({
               lead={selectedLead}
               audit={selectedLead.audits[0] ?? null}
               slug={slug}
+              canApprove={roleCan(role, "approve_send")}
+              drafts={[...selectedLead.drafts]
+                .sort((a, b) => CHANNEL_ORDER.indexOf(a.channel) - CHANNEL_ORDER.indexOf(b.channel))
+                .map((d): DraftRow => ({
+                  id: d.id,
+                  channel: d.channel,
+                  subject: d.subject,
+                  body: d.body,
+                  complianceStatus: d.complianceStatus,
+                  complianceRisk: d.complianceRisk,
+                  complianceReasons: Array.isArray(d.complianceJson)
+                    ? (d.complianceJson as string[])
+                    : [],
+                  approved: d.approved,
+                  providerUsed: d.providerUsed,
+                }))}
+              generateDrafts={generateDraftsAction.bind(null, slug, selectedLead.id)}
+              updateDraft={updateDraftAction.bind(null, slug)}
+              approveDraft={approveDraftAction.bind(null, slug)}
             />
           ) : (
             <p className="text-sm text-muted">
@@ -217,10 +246,20 @@ function LeadDetail({
   lead,
   audit,
   slug,
+  drafts,
+  canApprove,
+  generateDrafts,
+  updateDraft,
+  approveDraft,
 }: {
   lead: DetailLead;
   audit: DetailAudit;
   slug: string;
+  drafts: DraftRow[];
+  canApprove: boolean;
+  generateDrafts: () => Promise<{ ok?: boolean; error?: string } | { ok: boolean; composed: number; provider: string }>;
+  updateDraft: (id: string, subject: string, body: string) => Promise<{ ok?: boolean; error?: string }>;
+  approveDraft: (id: string) => Promise<{ ok?: boolean; error?: string }>;
 }) {
   const scores: AuditScores | null =
     audit && audit.reachable
@@ -270,6 +309,16 @@ function LeadDetail({
         <span className="tt-label">Offer match</span>
         <div className="font-medium">{offer.offer}</div>
         <div className="text-xs text-muted">{offer.rationale}</div>
+      </div>
+
+      <div className="rounded-md border border-line p-3">
+        <DraftPanel
+          drafts={drafts}
+          canApprove={canApprove}
+          generate={generateDrafts}
+          updateDraft={updateDraft}
+          approveDraft={approveDraft}
+        />
       </div>
 
       {audit ? (

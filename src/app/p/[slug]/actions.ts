@@ -8,6 +8,8 @@ import { createLead, importLeads, leadFromRecord, type LeadInput } from "@/lib/l
 import { parseCsvRecords } from "@/lib/csv";
 import { isLeadStatus } from "@/lib/leadStatus";
 import { runAuditAndGrade } from "@/lib/audit/runAudit";
+import { composeDraftsForLead } from "@/lib/outreach/draftEngine";
+import { checkCompliance, type DraftChannel } from "@/lib/outreach/complianceChecker";
 import type { ProfileSlug } from "@/lib/profiles";
 
 function str(fd: FormData, key: string): string | null {
@@ -74,6 +76,69 @@ export async function runAuditAction(slug: string, campaignId: string | null) {
   const summary = await runAuditAndGrade(profile.id, profile.slug as ProfileSlug, campaignId);
   revalidatePath(`/p/${slug}`);
   return { ok: true, ...summary };
+}
+
+export async function generateDraftsAction(slug: string, leadId: string) {
+  const { profile } = await requireProfile(slug, "create_drafts");
+  const summary = await composeDraftsForLead(profile.id, profile.slug as ProfileSlug, leadId);
+  revalidatePath(`/p/${slug}`);
+  return { ok: true, ...summary };
+}
+
+export async function updateDraftAction(
+  slug: string,
+  draftId: string,
+  subject: string,
+  body: string,
+) {
+  const { profile } = await requireProfile(slug, "create_drafts");
+  const draft = await prisma.outreachDraft.findFirst({
+    where: { id: draftId, profileId: profile.id },
+    include: { lead: { include: { profile: { include: { identity: true } } } } },
+  });
+  if (!draft) return { error: "Draft not found." };
+
+  const identity = draft.lead.profile.identity ?? {};
+  const compliance = checkCompliance({
+    channel: draft.channel as DraftChannel,
+    subject,
+    body,
+    identity,
+    hasPriorContact: false,
+  });
+  // Editing invalidates any prior approval.
+  await prisma.outreachDraft.update({
+    where: { id: draftId },
+    data: {
+      subject: subject.trim() || null,
+      body,
+      complianceStatus: compliance.status,
+      complianceRisk: compliance.risk,
+      complianceJson: compliance.reasons,
+      approved: false,
+      approvedBy: null,
+      approvedAt: null,
+    },
+  });
+  revalidatePath(`/p/${slug}`);
+  return { ok: true, compliance };
+}
+
+export async function approveDraftAction(slug: string, draftId: string) {
+  const { profile, userId } = await requireProfile(slug, "approve_send");
+  const draft = await prisma.outreachDraft.findFirst({
+    where: { id: draftId, profileId: profile.id },
+  });
+  if (!draft) return { error: "Draft not found." };
+  if (draft.complianceStatus !== "pass") {
+    return { error: "Cannot approve: compliance check has not passed." };
+  }
+  await prisma.outreachDraft.update({
+    where: { id: draftId },
+    data: { approved: true, approvedBy: userId, approvedAt: new Date() },
+  });
+  revalidatePath(`/p/${slug}`);
+  return { ok: true };
 }
 
 export async function updateLeadStatusAction(slug: string, leadId: string, status: string) {
