@@ -3,6 +3,7 @@ import Link from "next/link";
 import { getAccessibleProfiles } from "@/lib/access";
 import { PROFILES } from "@/lib/profiles";
 import { signOutAction } from "@/app/actions";
+import { AutoAnimate } from "@/components/AutoAnimate";
 
 export default async function SelectPage() {
   const accessible = await getAccessibleProfiles();
@@ -31,7 +32,7 @@ export default async function SelectPage() {
           membership.
         </p>
       ) : (
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+        <AutoAnimate className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {accessible.map(({ slug, role }) => {
             const brand = PROFILES[slug];
             return (
@@ -62,7 +63,7 @@ export default async function SelectPage() {
               </Link>
             );
           })}
-        </div>
+        </AutoAnimate>
       )}
     </main>
   );

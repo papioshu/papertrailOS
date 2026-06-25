@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getProfileRole } from "@/lib/access";
 import { getProfileBrand } from "@/lib/profiles";
+import { AutoAnimate } from "@/components/AutoAnimate";
 
 // The one-page profile workflow. Phase 1 ships the real shell: identity header,
 // the Collect→Archive rail, and honest empty states. Step execution and the
@@ -108,7 +109,7 @@ export default async function WorkflowPage({
       {/* Workflow rail */}
       <section className="tt-card tt-scan mb-6 p-5" style={glow}>
         <div className="tt-label mb-4">Workflow</div>
-        <ol className="flex flex-wrap gap-2">
+        <AutoAnimate as="ol" className="flex flex-wrap gap-2">
           {STEPS.map((step, i) => (
             <li
               key={step}
@@ -121,7 +122,7 @@ export default async function WorkflowPage({
               <span className="tt-label">pending · 0</span>
             </li>
           ))}
-        </ol>
+        </AutoAnimate>
       </section>
 
       {/* Main: lead table + detail panel */}
