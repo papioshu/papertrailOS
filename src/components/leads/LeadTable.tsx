@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useTransition } from "react";
 import { AutoAnimate } from "@/components/AutoAnimate";
 import { LEAD_STATUSES } from "@/lib/leadStatus";
@@ -20,11 +21,19 @@ export type LeadRow = {
 export function LeadTable({
   leads,
   updateStatus,
+  slug,
+  campaignId,
+  selectedId,
 }: {
   leads: LeadRow[];
   updateStatus: (leadId: string, status: string) => Promise<unknown>;
+  slug: string;
+  campaignId: string | null;
+  selectedId: string | null;
 }) {
   const [pending, start] = useTransition();
+  const hrefFor = (id: string) =>
+    `/p/${slug}?lead=${id}${campaignId ? `&c=${campaignId}` : ""}`;
 
   if (leads.length === 0) {
     return (
@@ -56,8 +65,17 @@ export function LeadTable({
         </thead>
         <AutoAnimate as="tbody" className={pending ? "opacity-60 transition" : "transition"}>
           {leads.map((l) => (
-            <tr key={l.id} className="border-b border-line/60 align-top">
-              <td className="px-2 py-2 font-medium">{l.businessName}</td>
+            <tr
+              key={l.id}
+              className={`border-b border-line/60 align-top ${
+                l.id === selectedId ? "bg-violet/10" : ""
+              }`}
+            >
+              <td className="px-2 py-2 font-medium">
+                <Link href={hrefFor(l.id)} scroll={false} className="hover:text-violet-soft hover:underline">
+                  {l.businessName}
+                </Link>
+              </td>
               <td className="px-2 py-2 text-muted">{l.category ?? "—"}</td>
               <td className="px-2 py-2 text-muted">{l.city ?? "—"}</td>
               <td className="px-2 py-2">{l.leadScore ?? "—"}</td>

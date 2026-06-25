@@ -147,11 +147,34 @@ model Lead {
   status         String    @default("New")
   profile        Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
   campaign       Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  audits         WebsiteAudit[]
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
   @@index([profileId])
   @@index([campaignId])
+}
+
+// One website audit run for a lead. The most recent row is the current audit.
+model WebsiteAudit {
+  id                    String   @id @default(cuid())
+  profileId             String
+  leadId                String
+  reachable             Boolean  @default(true)
+  websiteScore          Int
+  mobileScore           Int
+  seoScore              Int
+  conversionScore       Int
+  trustScore            Int
+  contentScore          Int
+  summary               String
+  findingsJson          Json
+  recommendedOfferAngle String?
+  lead                  Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdAt             DateTime @default(now())
+
+  @@index([leadId])
+  @@index([profileId])
 }
 
 model ActivityLog {

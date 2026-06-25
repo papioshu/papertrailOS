@@ -7,6 +7,8 @@ import { createCampaign } from "@/lib/campaigns";
 import { createLead, importLeads, leadFromRecord, type LeadInput } from "@/lib/leads";
 import { parseCsvRecords } from "@/lib/csv";
 import { isLeadStatus } from "@/lib/leadStatus";
+import { runAuditAndGrade } from "@/lib/audit/runAudit";
+import type { ProfileSlug } from "@/lib/profiles";
 
 function str(fd: FormData, key: string): string | null {
   const v = fd.get(key);
@@ -65,6 +67,13 @@ export async function importCsvAction(slug: string, campaignId: string | null, f
   const { imported, duplicates } = await importLeads(profile.id, campaignId, inputs);
   revalidatePath(`/p/${slug}`);
   return { ok: true, imported, duplicates };
+}
+
+export async function runAuditAction(slug: string, campaignId: string | null) {
+  const { profile } = await requireProfile(slug, "run_leadgen");
+  const summary = await runAuditAndGrade(profile.id, profile.slug as ProfileSlug, campaignId);
+  revalidatePath(`/p/${slug}`);
+  return { ok: true, ...summary };
 }
 
 export async function updateLeadStatusAction(slug: string, leadId: string, status: string) {
