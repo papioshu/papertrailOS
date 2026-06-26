@@ -11,7 +11,7 @@ import { matchOffer } from "@/lib/offer/offerMatch";
 import type { AuditScores, Finding } from "@/lib/audit/auditEngine";
 import type { ProfileSlug } from "@/lib/profiles";
 import { roleCan } from "@/lib/rbac";
-import { AutoAnimate } from "@/components/AutoAnimate";
+import { WorkflowRail, type RailState } from "@/components/workflow/WorkflowRail";
 import { CampaignBar } from "@/components/campaigns/CampaignBar";
 import { LeadTools } from "@/components/leads/LeadTools";
 import { RunAudit } from "@/components/leads/RunAudit";
@@ -33,11 +33,6 @@ import {
 } from "./actions";
 
 const CHANNEL_ORDER = ["email", "dm", "call", "followup1", "followup2"];
-
-const STEPS = [
-  "Collect", "Research", "Audit", "Grade", "Draft",
-  "Approve", "Send", "Follow Up", "Archive",
-] as const;
 
 export default async function WorkflowPage({
   params,
@@ -77,7 +72,6 @@ export default async function WorkflowPage({
   const glow = { ["--glow" as string]: brand.accent };
   const cap = profile.settings?.dailySendCap ?? 25;
   const mode = (profile.settings?.agentMode ?? "draft_only").replace("_", " ");
-  const archivedCount = leads.filter((l) => ARCHIVED_STATUSES.has(l.status)).length;
 
   const rows: LeadRow[] = leads.map((l) => ({
     id: l.id,
@@ -91,6 +85,49 @@ export default async function WorkflowPage({
     phone: l.phone,
     website: l.website,
   }));
+
+  // Profile-wide pipeline counts for the Workflow Rail.
+  const [
+    leadsTotal,
+    withWebsite,
+    gradedCount,
+    auditedGroups,
+    draftedGroups,
+    approvedCount,
+    sentCount,
+    archivedAll,
+  ] = await Promise.all([
+    prisma.lead.count({ where: { profileId: profile.id } }),
+    prisma.lead.count({ where: { profileId: profile.id, NOT: { website: null } } }),
+    prisma.lead.count({ where: { profileId: profile.id, NOT: { leadScore: null } } }),
+    prisma.websiteAudit.groupBy({ by: ["leadId"], where: { profileId: profile.id } }),
+    prisma.outreachDraft.groupBy({ by: ["leadId"], where: { profileId: profile.id } }),
+    prisma.outreachDraft.count({ where: { profileId: profile.id, approved: true } }),
+    prisma.sendQueue.count({ where: { profileId: profile.id, status: "sent" } }),
+    prisma.lead.count({ where: { profileId: profile.id, status: { in: [...ARCHIVED_STATUSES] } } }),
+  ]);
+
+  const railCounts = [
+    { key: "collect", label: "Collect", count: leadsTotal },
+    { key: "enrich", label: "Enrich", count: withWebsite },
+    { key: "audit", label: "Audit", count: auditedGroups.length },
+    { key: "grade", label: "Grade", count: gradedCount },
+    { key: "draft", label: "Draft", count: draftedGroups.length },
+    { key: "approve", label: "Approve", count: approvedCount },
+    { key: "send", label: "Send", count: sentCount },
+    { key: "reply", label: "Reply Radar", count: 0 },
+    { key: "followup", label: "Follow Up", count: 0 },
+    { key: "archive", label: "Archive", count: archivedAll },
+  ];
+  let frontier = -1;
+  railCounts.forEach((s, i) => {
+    if (s.count > 0) frontier = i;
+  });
+  const railSteps = railCounts.map((s, i) => ({
+    ...s,
+    state: (i < frontier ? "complete" : i === frontier ? "active" : "inactive") as RailState,
+  }));
+  if (frontier === -1) railSteps[0].state = "active";
 
   const boundCreateCampaign = createCampaignAction.bind(null, slug);
   const boundAddLead = addLeadAction.bind(null, slug, activeId);
@@ -142,27 +179,9 @@ export default async function WorkflowPage({
         />
       </section>
 
-      <section className="tt-card tt-scan mb-6 p-5" style={glow}>
-        <div className="tt-label mb-4">Workflow</div>
-        <AutoAnimate as="ol" className="flex flex-wrap gap-2">
-          {STEPS.map((step, i) => {
-            const count =
-              step === "Collect" ? leads.length : step === "Archive" ? archivedCount : 0;
-            return (
-              <li
-                key={step}
-                className="flex items-center gap-2 rounded-md border border-line bg-ink-2 px-3 py-2"
-              >
-                <span className="grid h-5 w-5 place-items-center rounded-full border border-line text-[0.6rem] text-muted">
-                  {i + 1}
-                </span>
-                <span className="text-sm">{step}</span>
-                <span className="tt-label">{count}</span>
-              </li>
-            );
-          })}
-        </AutoAnimate>
-      </section>
+      <div className="mb-6">
+        <WorkflowRail steps={railSteps} accent={brand.accent} />
+      </div>
 
       <section className="tt-card mb-6 space-y-4 p-5">
         <div className="tt-label">Leads</div>
