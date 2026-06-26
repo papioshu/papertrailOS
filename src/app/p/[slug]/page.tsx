@@ -161,6 +161,12 @@ export default async function WorkflowPage({
           <Stat label="Daily cap" value={`0 / ${cap}`} />
           <Stat label="Safety" value="Locked" tone="lime" />
           <Link
+            href={`/p/${slug}/archive`}
+            className="tt-label rounded-md border border-line px-3 py-1.5 hover:border-violet"
+          >
+            Archive
+          </Link>
+          <Link
             href="/select"
             className="tt-label rounded-md border border-line px-3 py-1.5 hover:border-violet"
           >

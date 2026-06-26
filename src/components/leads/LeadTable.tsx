@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useTransition } from "react";
 import { AutoAnimate } from "@/components/AutoAnimate";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { LEAD_STATUSES } from "@/lib/leadStatus";
 
 export type LeadRow = {
@@ -37,15 +38,10 @@ export function LeadTable({
 
   if (leads.length === 0) {
     return (
-      <div className="grid place-items-center rounded-md border border-dashed border-line py-16 text-center">
-        <p className="text-sm text-muted">
-          No leads yet.
-          <br />
-          <span className="text-xs">
-            Add one manually or import a CSV above.
-          </span>
-        </p>
-      </div>
+      <EmptyState
+        title="No leads yet"
+        hint="Your pipeline is clear. Add a lead or import a CSV to find signal."
+      />
     );
   }
 

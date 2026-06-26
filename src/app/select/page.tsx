@@ -44,11 +44,11 @@ export default async function SelectPage() {
               >
                 <div className="relative aspect-[3/4] w-full">
                   <Image
-                    src={brand.asset}
+                    src={brand.card}
                     alt={brand.name}
                     fill
                     sizes="(max-width:768px) 50vw, 25vw"
-                    className="object-cover opacity-90 transition group-hover:opacity-100"
+                    className="object-contain p-2 opacity-90 transition group-hover:opacity-100"
                   />
                 </div>
                 <div className="p-4">
