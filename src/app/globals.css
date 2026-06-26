@@ -3,20 +3,27 @@
 /* Papertrail OS — GEN X SOFT CLUB design tokens.
    Dark purple soft-club lighting, transit signage, analog paper. */
 @theme {
+  --color-void: #07050f;
   --color-ink: #0b0814;
   --color-ink-2: #110c20;
   --color-panel: #16102b;
   --color-panel-2: #1d1638;
   --color-line: #2c2350;
   --color-violet: #8b5cf6;
+  --color-violet-glow: #a78bfa;
   --color-violet-soft: #b8a4e3;
   --color-gold: #c9a227;
+  --color-caedis: #5b8def;
   --color-lime: #aef044;
   --color-signal: #ff4d6d;
   --color-fg: #ece8fb;
   --color-muted: #9a92b8;
+  --color-paper: #d8cfc0;
+  --color-paper-ink: #2a2438;
 
   --font-mono: "SFMono-Regular", "JetBrains Mono", "Consolas", monospace;
+  /* Condensed transit-signage display face (DIN family); degrades gracefully. */
+  --font-display: "Bahnschrift", "DIN Alternate", "Oswald", "Arial Narrow", system-ui, sans-serif;
 }
 
 html,
@@ -69,4 +76,60 @@ body {
 
 .tt-glow {
   box-shadow: 0 0 0 1px var(--color-line), 0 8px 40px -12px var(--glow, var(--color-violet));
+}
+
+/* Transit-signage display heading */
+.tt-display {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+}
+
+/* Full-bleed soft-club landing backdrop (silhouette + signage) */
+.tt-backdrop {
+  background:
+    linear-gradient(180deg, rgba(7, 5, 15, 0.55) 0%, rgba(7, 5, 15, 0.82) 100%),
+    url("/brand/bg.png") center/cover no-repeat fixed;
+}
+
+/* Bone-paper surface for Draft Room / Archive records */
+.tt-paper {
+  background:
+    linear-gradient(135deg, rgba(0, 0, 0, 0.04), rgba(0, 0, 0, 0)),
+    var(--color-paper);
+  color: var(--color-paper-ink);
+  border: 1px solid #b9ad9a;
+  border-radius: 0.4rem;
+}
+
+/* --- Access-card flip --- */
+.flip {
+  perspective: 1400px;
+}
+.flip-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.6s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transform-style: preserve-3d;
+}
+.flip.is-open .flip-inner {
+  transform: rotateY(180deg);
+}
+.flip-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  border-radius: 0.9rem;
+}
+.flip-back {
+  transform: rotateY(180deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flip-inner {
+    transition: none;
+  }
 }

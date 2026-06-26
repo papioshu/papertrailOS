@@ -10,7 +10,8 @@ export type ProfileBrand = {
   short: string;
   tagline: string;
   accent: string; // primary glow
-  asset: string; // /public path
+  asset: string; // square brand mark (/public path)
+  card: string; // vertical access-card art (/public path)
   focus: string;
 };
 
@@ -22,6 +23,7 @@ export const PROFILES: Record<ProfileSlug, ProfileBrand> = {
     tagline: "Venture Intelligence System",
     accent: "#c9a227",
     asset: "/brand/zathena.png",
+    card: "/brand/card-zathena.png",
     focus: "Websites, booking systems, CRM, SEO, automation, local presence",
   },
   papershoots: {
@@ -31,6 +33,7 @@ export const PROFILES: Record<ProfileSlug, ProfileBrand> = {
     tagline: "Capture. Collect. Connect.",
     accent: "#b8a4e3",
     asset: "/brand/papershoots.png",
+    card: "/brand/card-papershoots.png",
     focus: "Artist content, event recap, music videos, social clips, promo",
   },
   caedis: {
@@ -40,6 +43,7 @@ export const PROFILES: Record<ProfileSlug, ProfileBrand> = {
     tagline: "Aerial Intelligence System",
     accent: "#5b8def",
     asset: "/brand/caedis.png",
+    card: "/brand/card-caedis.png",
     focus: "Drone footage, aerial event & real estate coverage, flyovers",
   },
   bombsquad: {
@@ -49,6 +53,7 @@ export const PROFILES: Record<ProfileSlug, ProfileBrand> = {
     tagline: "CREATE OR DIE",
     accent: "#aef044",
     asset: "/brand/bombsquad.png",
+    card: "/brand/card-bombsquad.png",
     focus: "Events, media, art, music, pop-ups, streetwear, brand collabs",
   },
 };

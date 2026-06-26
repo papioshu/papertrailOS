@@ -10,7 +10,8 @@ export const authConfig = {
     authorized({ auth, request }) {
       const loggedIn = !!auth?.user;
       const path = request.nextUrl.pathname;
-      if (path === "/login") return true;
+      // Public: landing front door and the fallback login.
+      if (path === "/" || path === "/login") return true;
       return loggedIn;
     },
     jwt({ token, user }) {
