@@ -13,6 +13,7 @@ import { checkCompliance, type DraftChannel } from "@/lib/outreach/complianceChe
 import { dispatchDraft } from "@/lib/outreach/sendRunner";
 import { syncReplies } from "@/lib/outreach/replySync";
 import { runDueFollowups } from "@/lib/outreach/followupRunner";
+import { runLeadTrail } from "@/lib/automation/leadTrail";
 import type { ProfileSlug } from "@/lib/profiles";
 
 function str(fd: FormData, key: string): string | null {
@@ -150,6 +151,35 @@ export async function dispatchDraftAction(slug: string, draftId: string) {
   const result = await dispatchDraft(profile.id, draftId);
   revalidatePath(`/p/${slug}`);
   return result;
+}
+
+export async function runLeadTrailAction(
+  slug: string,
+  campaignId: string | null,
+  fd: FormData,
+) {
+  const { profile } = await requireProfile(slug, "run_leadgen");
+  const sourceType = str(fd, "sourceType") ?? "manual";
+  const niche = str(fd, "niche");
+  const city = str(fd, "city");
+  const collect =
+    sourceType !== "manual" && (niche || city)
+      ? {
+          niche,
+          city,
+          state: str(fd, "state"),
+          sourceType,
+          maxLeads: Number(str(fd, "maxLeads")) || 25,
+        }
+      : null;
+
+  const result = await runLeadTrail(profile.id, profile.slug as ProfileSlug, {
+    campaignId,
+    collect,
+    autoApprove: fd.get("autoApprove") === "on",
+  });
+  revalidatePath(`/p/${slug}`);
+  return { ok: true, ...result };
 }
 
 export async function syncRepliesAction(slug: string) {

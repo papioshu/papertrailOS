@@ -12,6 +12,7 @@ import type { AuditScores, Finding } from "@/lib/audit/auditEngine";
 import type { ProfileSlug } from "@/lib/profiles";
 import { roleCan } from "@/lib/rbac";
 import { WorkflowRail, type RailState } from "@/components/workflow/WorkflowRail";
+import { RunLeadTrail } from "@/components/automation/RunLeadTrail";
 import { CampaignBar } from "@/components/campaigns/CampaignBar";
 import { LeadTools } from "@/components/leads/LeadTools";
 import { RunAudit } from "@/components/leads/RunAudit";
@@ -33,6 +34,7 @@ import {
   markContactedAction,
   syncRepliesAction,
   runFollowupsAction,
+  runLeadTrailAction,
 } from "./actions";
 
 const CHANNEL_ORDER = ["email", "dm", "call", "followup1", "followup2"];
@@ -68,6 +70,8 @@ export default async function WorkflowPage({
           audits: { orderBy: { createdAt: "desc" }, take: 1 },
           drafts: true,
           sendItems: true,
+          replies: { orderBy: { receivedAt: "desc" } },
+          followups: true,
         },
       })
     : null;
@@ -151,6 +155,7 @@ export default async function WorkflowPage({
   const boundUpdateStatus = updateLeadStatusAction.bind(null, slug);
   const boundSync = syncRepliesAction.bind(null, slug);
   const boundFollowups = runFollowupsAction.bind(null, slug);
+  const boundRunTrail = runLeadTrailAction.bind(null, slug, activeId);
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
@@ -201,6 +206,10 @@ export default async function WorkflowPage({
           createCampaign={boundCreateCampaign}
         />
       </section>
+
+      <div className="mb-6">
+        <RunLeadTrail accent={brand.accent} run={boundRunTrail} />
+      </div>
 
       <div className="mb-6">
         <WorkflowRail steps={railSteps} accent={brand.accent} />
@@ -262,6 +271,17 @@ export default async function WorkflowPage({
               )}
               dispatchDraft={dispatchDraftAction.bind(null, slug)}
               markContacted={markContactedAction.bind(null, slug, selectedLead.id)}
+              replies={selectedLead.replies.map((r) => ({
+                id: r.id,
+                classification: r.classification,
+                snippet: r.snippet,
+                receivedAt: r.receivedAt.toISOString(),
+              }))}
+              followups={selectedLead.followups.map((f) => ({
+                channel: f.channel,
+                status: f.status,
+                scheduledFor: f.scheduledFor.toISOString(),
+              }))}
             />
           ) : (
             <p className="text-sm text-muted">
@@ -336,6 +356,8 @@ function LeadDetail({
   sendStatus,
   dispatchDraft,
   markContacted,
+  replies,
+  followups,
 }: {
   lead: DetailLead;
   audit: DetailAudit;
@@ -350,6 +372,8 @@ function LeadDetail({
   sendStatus: Record<string, { status: string; error?: string | null }>;
   dispatchDraft: (draftId: string) => Promise<{ status: "drafted" | "sent" | "blocked"; reason?: string; detail?: string }>;
   markContacted: () => Promise<{ ok?: boolean }>;
+  replies: { id: string; classification: string; snippet: string; receivedAt: string }[];
+  followups: { channel: string; status: string; scheduledFor: string }[];
 }) {
   const scores: AuditScores | null =
     audit && audit.reachable
@@ -429,6 +453,39 @@ function LeadDetail({
           markContacted={markContacted}
         />
       </div>
+
+      {(replies.length > 0 || followups.length > 0) && (
+        <div className="rounded-md border border-line p-3">
+          <span className="tt-label">Reply Radar · Follow-up</span>
+          {replies.length > 0 ? (
+            <ul className="mt-2 space-y-1.5">
+              {replies.slice(0, 3).map((r) => (
+                <li key={r.id} className="text-xs">
+                  <span className="font-semibold" style={{ color: "var(--color-violet-soft)" }}>
+                    {r.classification}
+                  </span>
+                  <span className="text-muted"> · {new Date(r.receivedAt).toLocaleDateString()}</span>
+                  <p className="line-clamp-2 text-fg/75">{r.snippet}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-1 text-xs text-muted">No replies yet.</p>
+          )}
+          {followups.length > 0 && (
+            <ul className="mt-2 space-y-0.5 text-[0.72rem] text-muted">
+              {followups.map((f) => (
+                <li key={f.channel} className="flex justify-between">
+                  <span>{f.channel === "followup1" ? "Follow-up 1" : "Follow-up 2"}</span>
+                  <span>
+                    {f.status} · {new Date(f.scheduledFor).toLocaleDateString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       {audit ? (
         audit.reachable ? (

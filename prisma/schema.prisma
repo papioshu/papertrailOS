@@ -54,6 +54,7 @@ model Profile {
   sendQueue   SendQueue[]
   replies     Reply[]
   followups   Followup[]
+  jobRuns     JobRun[]
   createdAt   DateTime            @default(now())
   updatedAt   DateTime            @updatedAt
 }
@@ -300,5 +301,22 @@ model Followup {
   updatedAt    DateTime  @updatedAt
 
   @@unique([leadId, channel])
+  @@index([profileId])
+}
+
+// One automation run of the Lead Trail (or a sub-job). Tracks stage progress
+// and a structured log so the UI and audit trail can show what happened.
+model JobRun {
+  id         String    @id @default(cuid())
+  profileId  String
+  kind       String    @default("lead_trail") // lead_trail | reply_sync | followups
+  status     String    @default("running")    // running | done | error
+  stage      String?
+  log        Json?
+  error      String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  profile    Profile   @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
   @@index([profileId])
 }
