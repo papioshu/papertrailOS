@@ -9,6 +9,7 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SCOPES = [
   "https://www.googleapis.com/auth/gmail.compose",
   "https://www.googleapis.com/auth/gmail.send",
+  "https://www.googleapis.com/auth/gmail.readonly", // Reply Radar thread sync
   "https://www.googleapis.com/auth/userinfo.email",
 ].join(" ");
 
@@ -134,7 +135,10 @@ export async function createGmailDraft(conn: Connection, encodedRaw: string): Pr
 }
 
 /** Send a message immediately. Used only by the controlled-send path. */
-export async function sendGmailMessage(conn: Connection, encodedRaw: string): Promise<string> {
+export async function sendGmailMessage(
+  conn: Connection,
+  encodedRaw: string,
+): Promise<{ id: string; threadId: string }> {
   const token = await freshAccessToken(conn);
   const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
     method: "POST",
@@ -142,6 +146,49 @@ export async function sendGmailMessage(conn: Connection, encodedRaw: string): Pr
     body: JSON.stringify({ raw: encodedRaw }),
   });
   if (!res.ok) throw new Error(`Gmail send failed: ${await res.text()}`);
-  const data = (await res.json()) as { id: string };
-  return data.id;
+  const data = (await res.json()) as { id: string; threadId: string };
+  return data;
+}
+
+export type InboundMessage = {
+  id: string;
+  from: string;
+  snippet: string;
+  receivedAt: Date;
+};
+
+/**
+ * Fetch a thread and return inbound messages (not from `ownEmail`) — i.e.
+ * replies to one of our sends. Used by Reply Radar sync.
+ */
+export async function getThreadInbound(
+  conn: Connection,
+  threadId: string,
+  ownEmail: string,
+): Promise<InboundMessage[]> {
+  const token = await freshAccessToken(conn);
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/threads/${threadId}?format=metadata&metadataHeaders=From`;
+  const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  if (!res.ok) throw new Error(`Gmail thread fetch failed: ${await res.text()}`);
+  const data = (await res.json()) as {
+    messages?: Array<{
+      id: string;
+      snippet?: string;
+      internalDate?: string;
+      payload?: { headers?: Array<{ name: string; value: string }> };
+    }>;
+  };
+  const own = ownEmail.toLowerCase();
+  const inbound: InboundMessage[] = [];
+  for (const m of data.messages ?? []) {
+    const from = m.payload?.headers?.find((h) => h.name.toLowerCase() === "from")?.value ?? "";
+    if (from.toLowerCase().includes(own)) continue; // our own outbound
+    inbound.push({
+      id: m.id,
+      from,
+      snippet: m.snippet ?? "",
+      receivedAt: m.internalDate ? new Date(Number(m.internalDate)) : new Date(),
+    });
+  }
+  return inbound;
 }

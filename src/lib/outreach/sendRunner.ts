@@ -72,6 +72,7 @@ export async function dispatchDraft(
     error?: string;
     gmailDraftId?: string;
     gmailMessageId?: string;
+    gmailThreadId?: string;
     sentAt?: Date;
   }) => {
     const existing = draft.sendItems[0];
@@ -114,16 +115,43 @@ export async function dispatchDraft(
       return { status: "drafted", detail: "Gmail draft created." };
     }
     // controlled send
-    const id = await sendGmailMessage(profile.gmail, encoded);
-    await record({ status: "sent", gmailMessageId: id, sentAt: new Date() });
+    const sent = await sendGmailMessage(profile.gmail, encoded);
+    await record({
+      status: "sent",
+      gmailMessageId: sent.id,
+      gmailThreadId: sent.threadId,
+      sentAt: new Date(),
+    });
     await prisma.lead.update({ where: { id: lead.id }, data: { status: "Contacted" } });
+    if (draft.channel === "email") await scheduleFollowups(profileId, lead.id);
     await prisma.activityLog.create({
-      data: { profileId, action: "gmail_send", detail: { draftId, gmailMessageId: id } },
+      data: { profileId, action: "gmail_send", detail: { draftId, gmailMessageId: sent.id } },
     });
     return { status: "sent", detail: "Message sent." };
   } catch (e) {
     const msg = e instanceof Error ? e.message : "send failed";
     await record({ status: "failed", error: msg });
     return { status: "blocked", reason: msg };
+  }
+}
+
+// Follow-up cadence. ponytail: fixed 3/7-day delays; lift into ProfileSettings
+// if profiles need per-campaign cadences.
+const FOLLOWUP_DAYS: Record<string, number> = { followup1: 3, followup2: 7 };
+
+/** Schedule the two follow-up touches after the first email send (idempotent). */
+export async function scheduleFollowups(profileId: string, leadId: string): Promise<void> {
+  const now = Date.now();
+  for (const [channel, days] of Object.entries(FOLLOWUP_DAYS)) {
+    await prisma.followup.upsert({
+      where: { leadId_channel: { leadId, channel } },
+      update: {}, // never reschedule an existing follow-up
+      create: {
+        profileId,
+        leadId,
+        channel,
+        scheduledFor: new Date(now + days * 86_400_000),
+      },
+    });
   }
 }

@@ -11,6 +11,8 @@ import { runAuditAndGrade } from "@/lib/audit/runAudit";
 import { composeDraftsForLead } from "@/lib/outreach/draftEngine";
 import { checkCompliance, type DraftChannel } from "@/lib/outreach/complianceChecker";
 import { dispatchDraft } from "@/lib/outreach/sendRunner";
+import { syncReplies } from "@/lib/outreach/replySync";
+import { runDueFollowups } from "@/lib/outreach/followupRunner";
 import type { ProfileSlug } from "@/lib/profiles";
 
 function str(fd: FormData, key: string): string | null {
@@ -148,6 +150,24 @@ export async function dispatchDraftAction(slug: string, draftId: string) {
   const result = await dispatchDraft(profile.id, draftId);
   revalidatePath(`/p/${slug}`);
   return result;
+}
+
+export async function syncRepliesAction(slug: string) {
+  const { profile } = await requireProfile(slug, "mark_status");
+  try {
+    const result = await syncReplies(profile.id);
+    revalidatePath(`/p/${slug}`);
+    return { ok: true, ...result };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Reply sync failed." };
+  }
+}
+
+export async function runFollowupsAction(slug: string) {
+  const { profile } = await requireProfile(slug, "approve_send");
+  const result = await runDueFollowups(profile.id);
+  revalidatePath(`/p/${slug}`);
+  return { ok: true, ...result };
 }
 
 export async function markContactedAction(slug: string, leadId: string) {

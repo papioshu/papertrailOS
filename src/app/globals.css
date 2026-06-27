@@ -159,3 +159,18 @@ body {
     animation: none;
   }
 }
+
+/* Reply Radar scope sweep */
+@keyframes tt-sweep {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.tt-sweep {
+  animation: tt-sweep 4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tt-sweep {
+    animation: none;
+  }
+}

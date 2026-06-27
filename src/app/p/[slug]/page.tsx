@@ -18,6 +18,7 @@ import { RunAudit } from "@/components/leads/RunAudit";
 import { LeadTable, type LeadRow } from "@/components/leads/LeadTable";
 import { DraftPanel, type DraftRow } from "@/components/outreach/DraftPanel";
 import { SendPanel } from "@/components/outreach/SendPanel";
+import { ReplyRadarPanel } from "@/components/outreach/ReplyRadarPanel";
 import { googleConfigured } from "@/lib/gmail/gmail";
 import {
   createCampaignAction,
@@ -30,6 +31,8 @@ import {
   approveDraftAction,
   dispatchDraftAction,
   markContactedAction,
+  syncRepliesAction,
+  runFollowupsAction,
 } from "./actions";
 
 const CHANNEL_ORDER = ["email", "dm", "call", "followup1", "followup2"];
@@ -107,6 +110,18 @@ export default async function WorkflowPage({
     prisma.lead.count({ where: { profileId: profile.id, status: { in: [...ARCHIVED_STATUSES] } } }),
   ]);
 
+  // Reply Radar + follow-up data.
+  const [repliesCount, recentReplies, classGroups, followupScheduled, followupSent] =
+    await Promise.all([
+      prisma.reply.count({ where: { profileId: profile.id } }),
+      prisma.reply.findMany({ where: { profileId: profile.id }, orderBy: { receivedAt: "desc" }, take: 8 }),
+      prisma.reply.groupBy({ by: ["classification"], where: { profileId: profile.id }, _count: { _all: true } }),
+      prisma.followup.count({ where: { profileId: profile.id, status: "scheduled" } }),
+      prisma.followup.count({ where: { profileId: profile.id, status: "sent" } }),
+    ]);
+  const classCounts = classGroups.map((g) => ({ label: g.classification, count: g._count._all }));
+  const lastSignal = recentReplies[0]?.receivedAt ?? null;
+
   const railCounts = [
     { key: "collect", label: "Collect", count: leadsTotal },
     { key: "enrich", label: "Enrich", count: withWebsite },
@@ -115,8 +130,8 @@ export default async function WorkflowPage({
     { key: "draft", label: "Draft", count: draftedGroups.length },
     { key: "approve", label: "Approve", count: approvedCount },
     { key: "send", label: "Send", count: sentCount },
-    { key: "reply", label: "Reply Radar", count: 0 },
-    { key: "followup", label: "Follow Up", count: 0 },
+    { key: "reply", label: "Reply Radar", count: repliesCount },
+    { key: "followup", label: "Follow Up", count: followupScheduled + followupSent },
     { key: "archive", label: "Archive", count: archivedAll },
   ];
   let frontier = -1;
@@ -134,6 +149,8 @@ export default async function WorkflowPage({
   const boundImport = importCsvAction.bind(null, slug, activeId);
   const boundRunAudit = runAuditAction.bind(null, slug, activeId);
   const boundUpdateStatus = updateLeadStatusAction.bind(null, slug);
+  const boundSync = syncRepliesAction.bind(null, slug);
+  const boundFollowups = runFollowupsAction.bind(null, slug);
 
   return (
     <main className="mx-auto max-w-7xl px-6 py-8">
@@ -254,6 +271,28 @@ export default async function WorkflowPage({
           )}
         </div>
       </section>
+
+      <div className="mt-6">
+        <ReplyRadarPanel
+          gmail={{
+            configured: googleConfigured(),
+            connected: Boolean(profile.gmail),
+            email: profile.gmail?.email ?? null,
+          }}
+          classCounts={classCounts}
+          replies={recentReplies.map((r) => ({
+            id: r.id,
+            classification: r.classification,
+            fromEmail: r.fromEmail,
+            snippet: r.snippet,
+            receivedAt: r.receivedAt.toISOString(),
+          }))}
+          followups={{ scheduled: followupScheduled, sent: followupSent }}
+          lastSignal={lastSignal ? lastSignal.toISOString() : null}
+          sync={boundSync}
+          runFollowups={boundFollowups}
+        />
+      </div>
     </main>
   );
 }
