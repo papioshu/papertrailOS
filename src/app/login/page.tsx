@@ -38,12 +38,12 @@ export default async function LoginPage({
 
         <form action={authenticate} className="space-y-4">
           <label className="block">
-            <span className="tt-label">Email</span>
+            <span className="tt-label">Email or username</span>
             <input
               name="email"
-              type="email"
+              type="text"
               required
-              autoComplete="email"
+              autoComplete="username"
               className="mt-1 w-full rounded-md border border-line bg-ink-2 px-3 py-2 text-sm outline-none focus:border-violet"
             />
           </label>
